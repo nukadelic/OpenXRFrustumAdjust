@@ -1,5 +1,5 @@
 {
-  "name": "com.koochyrat.OpenXRFrustumAdjust",
+  "name": "com.koochyrat.openxrfrustumadjust",
   "description": "For canted headsets like Pimax, calculate proper culling matrix to avoid objects being culled too early at far edges in Unity. Prevents objects popping in and out of view ",
   "version": "1.0.0",
   "unity": "2020.3",
