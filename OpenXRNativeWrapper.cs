@@ -119,50 +119,69 @@ namespace com.koochyrat.OpenXRFrustumAdjust
             return true;
         }
 
-        protected void Init()
+        protected bool Init()
         {
             //the mother of all functions. through this we can get the address of every possible OpenXR function
             _xrGetInstanceProcAddr = Marshal.GetDelegateForFunctionPointer<_xrGetInstanceProcFunc>(xrGetInstanceProcAddr);
-            int res;
+            int res1, res2, res3;
             IntPtr newProcAddr;
 
-            res = _xrGetInstanceProcAddr(xrInstance, "xrDestroySpace", out newProcAddr);
-            Debug.Assert(res == 0);
+            res1 = _xrGetInstanceProcAddr(xrInstance, "xrDestroySpace", out newProcAddr);
+            
             _xrDestroySpace = Marshal.GetDelegateForFunctionPointer<_xrDestroySpaceFunc>(newProcAddr);
 
-            res = _xrGetInstanceProcAddr(xrInstance, "xrCreateReferenceSpace", out newProcAddr);
-            Debug.Assert(res == 0);
+            res2 = _xrGetInstanceProcAddr(xrInstance, "xrCreateReferenceSpace", out newProcAddr);
+
             _xrCreateReferenceSpace = Marshal.GetDelegateForFunctionPointer<_xrCreateReferenceSpaceFunc>(newProcAddr);
 
-            res = _xrGetInstanceProcAddr(xrInstance, "xrLocateViews", out newProcAddr);
-            Debug.Assert(res == 0);
+            res3 = _xrGetInstanceProcAddr(xrInstance, "xrLocateViews", out newProcAddr);
+
             _xrLocateViews = Marshal.GetDelegateForFunctionPointer<_xrLocateViewsFunc>(newProcAddr);
+
+            if( res1 != 0 ) Debug.Log("[OpenXRNativeWrapper] bad res at xrDestroySpace ret code = " + res1 );
+            if( res2 != 0 ) Debug.Log("[OpenXRNativeWrapper] bad res at xrCreateReferenceSpace ret code = " + res2 );
+            if( res3 != 0 ) Debug.Log("[OpenXRNativeWrapper] bad res at xrLocateViews ret code = " + res3 );
+
+            return res1 == 0 && res1 == res2 && res2 == res3;
         }
         protected override void OnSessionBegin(ulong xrSession)
         {
-            Init();
+            int v_res, r_res, d_res, viewOutputN;
 
+            if( ! Init() )
+            {
+                HasConflict = true;
+                return;
+            }
+
+            Debug.Log("[OpenXRNativeWrapper] Init complete" );
+            
             this.xrSession = xrSession;
-
-            int res;
 
             XrPosef xrPose = new XrPosef { orientation = Quaternion.identity, position = Vector3.zero };
             //create a reference space of type view so that we can get the left and right eye transforms relative to head
             XrReferenceSpaceCreateInfo createInfo = new XrReferenceSpaceCreateInfo { type = XrReferenceSpaceCreateInfo.TYPE, next = IntPtr.Zero, referenceSpaceType = 1, poseInReferenceSpace = xrPose };
-            res = _xrCreateReferenceSpace(xrSession, in createInfo, out xrSpace);
-            Debug.Assert(res == 0);
+            r_res = _xrCreateReferenceSpace(xrSession, in createInfo, out xrSpace);
 
             //OpenXR spec says never to put time = 0, but it seems to work. we are taking view space anyway which is constant with time. viewConfigurationType 2 means stereo
             XrViewLocateInfo viewLocateInfo = new XrViewLocateInfo { type = XrViewLocateInfo.TYPE, next = IntPtr.Zero, viewConfigurationType = 2, displayTime = 0, space = xrSpace };
             XrViewState viewState;
-            int viewOutputN;
-            res = _xrLocateViews(xrSession, in viewLocateInfo, out viewState, views.Length, out viewOutputN, ref views[0]); //this retrieves all the parameters of the left and right eyes
-            Debug.Assert(res == 0);
-            isInit = (res == 0 && viewOutputN == 2);
-            Debug.Assert(isInit);
+            
+            //this retrieves all the parameters of the left and right eyes
+            v_res = _xrLocateViews(xrSession, in viewLocateInfo, out viewState, views.Length, out viewOutputN, ref views[0] ); 
 
-            res = _xrDestroySpace(xrSpace);
-            Debug.Assert(res == 0);
+            isInit = (v_res == 0 && viewOutputN == 2);
+            
+            d_res = _xrDestroySpace(xrSpace);
+
+            if( r_res != 0 )                      Debug.Log("[OpenXRNativeWrapper] bad res at _xrCreateReferenceSpace ret code = " + r_res );
+            if( v_res != 0 )                      Debug.Log("[OpenXRNativeWrapper] Can't locate views, ret code: " + v_res );
+            if( v_res == 0 && viewOutputN != 2 )  Debug.Log("[OpenXRNativeWrapper] Wrong output N count = " + viewOutputN );
+            if( d_res != 0 )                      Debug.Log("[OpenXRNativeWrapper] Can't destroy xr space, ret code: " + d_res );
+            if( isInit )                          Debug.Log("[OpenXRNativeWrapper] Session Ready");
+            else HasConflict = true;
         }
+
+        public static bool HasConflict = false;
     }
 }

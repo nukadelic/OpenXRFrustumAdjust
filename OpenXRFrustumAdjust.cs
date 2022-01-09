@@ -1,7 +1,5 @@
 namespace com.koochyrat.OpenXRFrustumAdjust
 {
-    using System.Collections;
-    using System.Collections.Generic;
     using UnityEngine;
     using UnityEngine.Rendering;
 
@@ -26,6 +24,12 @@ namespace com.koochyrat.OpenXRFrustumAdjust
 
         void Update()
         {
+            if( OpenXRNativeWrapper.HasConflict ) 
+            {
+                enabled = false;
+                return;
+            }
+
             //need to wait until view info is available. run once only each time enabled
             if(!isInit && OpenXRNativeWrapper.isInit)
             {
